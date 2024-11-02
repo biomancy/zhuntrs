@@ -1,2 +1,2 @@
 pub mod py;
-pub mod zhuntr;
+pub mod zhuntrs;

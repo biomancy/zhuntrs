@@ -7,7 +7,7 @@ use test::{black_box, Bencher};
 
 use eyre::{ContextCompat, Result, WrapErr};
 
-use zhuntr;
+use zhuntrs;
 
 fn load_sequence(seqpath: &str) -> Result<Vec<u8>> {
     let file = PathBuf::from(file!());
@@ -24,7 +24,7 @@ fn bench_mtdna_1_6(b: &mut Bencher) -> Result<()> {
     let sequence = load_sequence("resources/mtDNA.NC_012920.1.txt")
         .wrap_err("Unable to load mtDNA sequence")?;
 
-    b.iter(|| black_box(zhuntr::py::predict(&sequence, 1, 6, 0.0, false)));
+    b.iter(|| black_box(zhuntrs::py::predict(&sequence, 1, 6, 0.0, false)));
     Ok(())
 }
 
@@ -33,6 +33,6 @@ fn bench_random_5_12(b: &mut Bencher) -> Result<()> {
     let sequence =
         load_sequence("resources/random.txt").wrap_err("Unable to load random sequence")?;
 
-    b.iter(|| black_box(zhuntr::py::predict(&sequence, 5, 12, 0.0, false)));
+    b.iter(|| black_box(zhuntrs::py::predict(&sequence, 5, 12, 0.0, false)));
     Ok(())
 }

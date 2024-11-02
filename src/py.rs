@@ -2,7 +2,7 @@ use eyre::{eyre, WrapErr};
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
 
-use crate::zhuntr;
+use crate::zhuntrs;
 
 type ZHOutput = (Vec<usize>, Vec<usize>, Vec<f64>, Vec<String>, Vec<String>);
 
@@ -33,12 +33,12 @@ pub fn predict(
     wrap: bool,
 ) -> PyResult<ZHOutput> {
     let wrap = match wrap {
-        true => zhuntr::TailExtension::WrapAround(maxdn as usize * 2),
-        false => zhuntr::TailExtension::None,
+        true => zhuntrs::TailExtension::WrapAround(maxdn as usize * 2),
+        false => zhuntrs::TailExtension::None,
     };
 
-    let mut engine = zhuntr::Engine::new(None);
-    let mut buffer = zhuntr::Prediction::default();
+    let mut engine = zhuntrs::Engine::new(None);
+    let mut buffer = zhuntrs::Prediction::default();
     engine
         .predict(
             sequence,
@@ -97,8 +97,8 @@ pub fn stream(
     }
 
     Ok(PyPredictionsStream {
-        engine: zhuntr::Engine::new(None),
-        buffer: zhuntr::Prediction::default(),
+        engine: zhuntrs::Engine::new(None),
+        buffer: zhuntrs::Prediction::default(),
 
         sequence,
         mindn,
@@ -113,8 +113,8 @@ pub fn stream(
 
 #[pyclass]
 pub struct PyPredictionsStream {
-    engine: zhuntr::Engine,
-    buffer: zhuntr::Prediction,
+    engine: zhuntrs::Engine,
+    buffer: zhuntrs::Prediction,
 
     sequence: Py<PyBytes>,
     mindn: usize,
@@ -147,14 +147,14 @@ impl PyPredictionsStream {
         // Handle tail extension strategy
         let strategy = if end == sequence.len() {
             match self.wrap {
-                true => zhuntr::TailExtension::WrapAroundFrom(
+                true => zhuntrs::TailExtension::WrapAroundFrom(
                     &sequence[..self.maxdn * 2],
                     self.maxdn * 2,
                 ),
-                false => zhuntr::TailExtension::None,
+                false => zhuntrs::TailExtension::None,
             }
         } else {
-            zhuntr::TailExtension::None
+            zhuntrs::TailExtension::None
         };
 
         // Run & return predictions
@@ -195,9 +195,9 @@ impl PyPredictionsStream {
 }
 
 #[pymodule]
-#[pyo3(name = "zhuntr")]
-fn _py_module(_py: Python, m: &PyModule) -> PyResult<()> {
-    m.add_function(wrap_pyfunction!(predict, m)?)?;
-    m.add_function(wrap_pyfunction!(stream, m)?)?;
+#[pyo3(name = "zhuntrs")]
+pub fn _zhuntrs(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    module.add_function(wrap_pyfunction!(predict, module)?)?;
+    module.add_function(wrap_pyfunction!(stream, module)?)?;
     Ok(())
 }

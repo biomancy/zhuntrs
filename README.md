@@ -1,4 +1,4 @@
-## Z-Hunt(r)
+## Z-Hunt[rs]
 
 This repository contains a Rust port of the [Z-Hunt algorithm](https://pubmed.ncbi.nlm.nih.gov/1601856/), which is
 designed to predict the propensity of DNA to adopt a left-handed Z-DNA conformation. Unlike the original implementation,
@@ -12,7 +12,7 @@ the [Compatibility](#compatibility) section for more details.
 The library can be installed from PyPI using `pip`:
 
 ```shell
-pip install zhuntr
+pip install zhuntrs
 ```
 
 ### Usage
@@ -20,14 +20,14 @@ pip install zhuntr
 Here is a simple example of how to use the library in Python:
 
 ```python
-import zhuntr
+import zhuntrs
 
 sequence = "nATGCGCGCGGCATGC".encode("ASCII")  # The target sequence (only ATGCN are accepted, case insensitive)
 mindn, maxdn = 3, 6  # Minimum and maximum length of evaluated DNA windows in dinucleotides
 threshold = 1_000  # Windows with a ZH-score below this threshold will not be reported
 
 # Make a prediction
-start, end, score, window, conformation = zhuntr.predict(sequence, mindn, maxdn, threshold)
+start, end, score, window, conformation = zhuntrs.predict(sequence, mindn, maxdn, threshold)
 
 # start: start coordinates of evaluated DNA windows
 assert start == [0, 1, 2]
@@ -56,7 +56,7 @@ footprint and allow interruption when required. This feature is especially usefu
 ```python
 slice_size = 512  # Size of each slice, default is 1024
 
-for start, end, score, window, conformation in zhuntr.stream(sequence, mindn, maxdn, threshold, ssize=slice_size):
+for start, end, score, window, conformation in zhuntrs.stream(sequence, mindn, maxdn, threshold, ssize=slice_size):
     length = len(start)
     # The last slice may be shorter than slice_size but not empty
     assert 0 < length <= slice_size
@@ -65,7 +65,7 @@ for start, end, score, window, conformation in zhuntr.stream(sequence, mindn, ma
     ...
 ```
 
-This mode is equivalent to calling `zhuntr.predict` on the entire sequence and processing the output slice by slice,
+This mode is equivalent to calling `zhuntrs.predict` on the entire sequence and processing the output slice by slice,
 where each slice has a size equal to `ssize`, except, perhaps, for the last one. Note that the 'wrapping around' of the
 sequence in this mode occurs as usual, i.e., only once, and all coordinates are provided relative to the original
 sequence.

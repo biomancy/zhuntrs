@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use eyre::{eyre, ContextCompat, Result, WrapErr};
 use itertools::Itertools;
 
-use zhuntr;
+use zhuntrs;
 
 fn compare_implementations(seqpath: &str, expected: &str) -> Result<()> {
     let file = PathBuf::from(file!());
@@ -44,7 +44,7 @@ fn compare_implementations(seqpath: &str, expected: &str) -> Result<()> {
         .parse()
         .wrap_err("Unable to parse Z-Hunt parameter: maxw")?;
 
-    let predicted = zhuntr::py::predict(sequence.as_bytes(), mindn, maxdn, 0.0, true)?;
+    let predicted = zhuntrs::py::predict(sequence.as_bytes(), mindn, maxdn, 0.0, true)?;
 
     let mut errors = vec![];
     for (ind, line) in lines.enumerate() {
