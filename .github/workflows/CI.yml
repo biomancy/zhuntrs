@@ -70,7 +70,7 @@ jobs:
     runs-on: macos-latest
     strategy:
       matrix:
-        target: [x86_64, aarch64]
+        target: [x86_64]
         python: ['3.14']
     steps:
       - uses: actions/checkout@v3
@@ -99,7 +99,7 @@ jobs:
           command: sdist
           args: --out dist
       - name: Upload sdist
-        uses: actions/upload-artifact@4
+        uses: actions/upload-artifact@v4
         with:
           name: sdist-${{ matrix.target }}-wheels
           path: ${{ env.PYTHON_PACKAGE_PATH }}
