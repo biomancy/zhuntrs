@@ -15,6 +15,7 @@ permissions:
 
 env:
   PY_VERSIONS: "3.14t 3.14 3.13t 3.13 3.12 3.11 3.10"
+  PYTHON_PACKAGE_PATH: dist
 
 jobs:
   linux:
@@ -38,8 +39,8 @@ jobs:
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
-          name: wheels
-          path: dist
+          name: linux-${{ matrix.target }}-wheels
+          path: ${{ env.PYTHON_PACKAGE_PATH }}
 
   windows:
     runs-on: windows-latest
@@ -62,8 +63,8 @@ jobs:
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
-          name: wheels
-          path: dist
+          name: windows-${{ matrix.target }}-wheels
+          path: ${{ env.PYTHON_PACKAGE_PATH }}
 
   macos:
     runs-on: macos-latest
@@ -85,8 +86,8 @@ jobs:
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
-          name: wheels
-          path: dist
+          name: macos-${{ matrix.target }}-wheels
+          path: ${{ env.PYTHON_PACKAGE_PATH }}
 
   sdist:
     runs-on: ubuntu-latest
@@ -98,10 +99,10 @@ jobs:
           command: sdist
           args: --out dist
       - name: Upload sdist
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@4
         with:
-          name: wheels
-          path: dist
+          name: sdist-${{ matrix.target }}-wheels
+          path: ${{ env.PYTHON_PACKAGE_PATH }}
 
   release:
     name: Release
