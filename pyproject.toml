@@ -1,15 +1,15 @@
 [project]
 name = "zhuntrs"
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
-dynamic = ["version", "description", "license", "authors", "readme", "repository"]
+dynamic = ["version", "description", "license", "authors", "readme"]
 
 [build-system]
-requires = ["maturin>=1.4,<2.0"]
+requires = ["maturin>=1.10.2,<2.0"]
 build-backend = "maturin"
 
 [tool.maturin]

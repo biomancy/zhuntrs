@@ -1,8 +1,8 @@
 [package]
 name = "zhuntrs"
-version = "0.0.4"
+version = "0.0.5"
 authors = ["Aleksandr Fedorov"]
-edition = "2021"
+edition = "2024"
 description = "Z-Hunt[rs] is a Rust port of the Z-Hunt algorithm for predicting the propensity of DNA to adopt a left-handed Z-DNA conformation."
 readme = "README.md"
 repository = "https://github.com/biomancy/zhuntrs"
@@ -13,6 +13,6 @@ name = "zhuntrs"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-pyo3 = { version = "0.22.5", features = ["eyre"] }
-itertools = "0.13.0"
+pyo3 = { version = "0.27.1", features = ["eyre"] }
+itertools = "0.14.0"
 eyre = "0.6.12"
