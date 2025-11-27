@@ -13,41 +13,34 @@ on:
 permissions:
   contents: read
 
-env:
-  PY_VERSIONS: "3.14t 3.14 3.13t 3.13 3.12 3.11 3.10"
-  PYTHON_PACKAGE_PATH: dist
-
 jobs:
   linux:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        target: [x86_64]
-        python: ['3.14']
+        target: [ x86_64 ]
+        python: ['3.14', '3.13', '3.12', '3.11', '3.10']
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python }}
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
-          args: --release --out dist --interpreter ${{ env.PIXI_VERSION }}
+          args: --release --out dist --interpreter python${{ matrix.python }}
           sccache: 'true'
           manylinux: auto
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
-          name: linux-${{ matrix.target }}-wheels
-          path: ${{ env.PYTHON_PACKAGE_PATH }}
+          name: linux-${{ matrix.target }}-${{ matrix.python }}-wheels
+          path: dist
 
   windows:
     runs-on: windows-latest
     strategy:
       matrix:
         target: [x64]
-        python: ['3.14']
+        python: ['3.14', '3.13', '3.12', '3.11', '3.10']
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
@@ -58,20 +51,20 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
-          args: --release --out dist --interpreter ${{ env.PIXI_VERSION }}
+          args: --release --out dist --find-interpreter
           sccache: 'true'
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
-          name: windows-${{ matrix.target }}-wheels
-          path: ${{ env.PYTHON_PACKAGE_PATH }}
+          name: windows-${{ matrix.target }}-${{ matrix.python }}-wheels
+          path: dist
 
   macos:
     runs-on: macos-latest
     strategy:
       matrix:
         target: [x86_64]
-        python: ['3.14']
+        python: ['3.14', '3.13', '3.12', '3.11', '3.10']
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
@@ -81,13 +74,13 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
-          args: --release --out dist --interpreter ${{ env.PIXI_VERSION }}
+          args: --release --out dist --find-interpreter
           sccache: 'true'
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
-          name: macos-${{ matrix.target }}-wheels
-          path: ${{ env.PYTHON_PACKAGE_PATH }}
+          name: macos-${{ matrix.target }}-${{ matrix.python }}-wheels
+          path: dist
 
   sdist:
     runs-on: ubuntu-latest
@@ -101,8 +94,8 @@ jobs:
       - name: Upload sdist
         uses: actions/upload-artifact@v4
         with:
-          name: sdist-${{ matrix.target }}-wheels
-          path: ${{ env.PYTHON_PACKAGE_PATH }}
+          name: sdist-wheels
+          path: dist
 
   release:
     name: Release
@@ -122,4 +115,4 @@ jobs:
           MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
         with:
           command: upload
-          args: --non-interactive --skip-existing dist/*.whl
+          args: --non-interactive --skip-existing dist/*
