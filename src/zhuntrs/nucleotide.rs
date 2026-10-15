@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use eyre::{eyre, Error, Result};
+use crate::{Error, Result};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 #[repr(u8)]
@@ -22,7 +22,7 @@ impl TryFrom<u8> for Nucleotide {
             b'G' | b'g' => Ok(Nucleotide::G),
             b'T' | b't' => Ok(Nucleotide::T),
             b'N' | b'n' => Ok(Nucleotide::N),
-            _ => Err(eyre!("Invalid nucleotide: {value}")),
+            _ => Err(Error::InvalidNucleotide { value }),
         }
     }
 }
@@ -37,5 +37,20 @@ impl Display for Nucleotide {
             Nucleotide::N => "N".to_string(),
         };
         write!(f, "{}", str)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rejects_invalid_bytes() {
+        for value in [b'X', b'\n', 0, 255] {
+            assert!(matches!(
+                Nucleotide::try_from(value),
+                Err(Error::InvalidNucleotide { value: byte }) if byte == value
+            ));
+        }
     }
 }

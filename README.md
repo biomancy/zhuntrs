@@ -15,6 +15,9 @@ The library can be installed from PyPI using `pip`:
 pip install zhuntrs
 ```
 
+Wheels are built and tested for CPython 3.10–3.15 on Linux, Windows, and macOS (x86-64),
+including the supported free-threaded builds of Python 3.14 and 3.15.
+
 ### Usage
 
 Here is a simple example of how to use the library in Python:
@@ -26,49 +29,61 @@ sequence = "nATGCGCGCGGCATGC".encode("ASCII")  # The target sequence (only ATGCN
 mindn, maxdn = 3, 6  # Minimum and maximum length of evaluated DNA windows in dinucleotides
 threshold = 1_000  # Windows with a ZH-score below this threshold will not be reported
 
-# Make a prediction
-start, end, score, window, conformation = zhuntrs.predict(sequence, mindn, maxdn, threshold)
+# Validate and freeze the parameters, then predict any number of sequences
+engine = zhuntrs.Engine(mindn, maxdn, threshold)
+prediction: zhuntrs.Prediction = engine.predict(sequence)
 
-# start: start coordinates of evaluated DNA windows
-assert start == [0, 1, 2]
+assert len(prediction) == 3  # Number of reported windows
 
-# end: end coordinates of DNA windows starting at the above coordinates and 
-#      having the highest ZH-score among [mindn; maxdn] windows
-assert end == [10, 11, 10]
+# Zero-based starts and exclusive ends of the locally optimal windows
+assert prediction.start == (0, 1, 2)
+assert prediction.end == (10, 11, 10)
 
-# score: ZH-score for each window
-assert [int(zh) for zh in score] == [2220, 1057, 3428]
-
-# window: DNA sequence for each window:
-#         window[i] = sequence[start[i]:end[i]]
-assert window == ['NATGCGCGCG', 'ATGCGCGCGG', 'TGCGCGCG']
-
-# conformation: DNA conformation (anti/syn) for each window
-assert conformation == ['ASASASASAS', 'SASASASASA', 'ASASASAS']
+# Scores, sequences, and anti/syn conformations of those windows
+assert [int(score) for score in prediction.zhscore] == [2220, 1057, 3428]
+assert prediction.sequence == ('NATGCGCGCG', 'ATGCGCGCGG', 'TGCGCGCG')
+assert prediction.conformation == ('ASASASASAS', 'SASASASASA', 'ASASASAS')
 ```
 
-Note: the default behaviour of the original implementation is to "wrap around" windows at the end of the sequence.
-It can be enabled by passing `wrap=True` to the `predict` function.
+`Prediction` is a Python extension class with read-only `start`, `end`, `zhscore`,
+`sequence`, and `conformation` columns. Each column is an immutable tuple constructed once;
+repeated attribute access returns the same tuple without copying its contents.
 
-The library also supports stream predictions, wherein the sequence is evaluated slice by slice to minimize the memory
-footprint and allow interruption when required. This feature is especially useful when processing large sequences:
+The original implementation treats sequences as circular. Enable this with
+`zhuntrs.Engine(mindn, maxdn, threshold, wrap=True)`.
+
+The engine supports streaming predictions for large sequences. It reads and validates the
+entire sequence, then scores it in chunks so results can be processed incrementally:
 
 ```python
 slice_size = 512  # Size of each slice, default is 1024
 
-for start, end, score, window, conformation in zhuntrs.stream(sequence, mindn, maxdn, threshold, ssize=slice_size):
-    length = len(start)
-    # The last slice may be shorter than slice_size but not empty
-    assert 0 < length <= slice_size
-    # All arrays have the same length and semantics as before
-    assert len(start) == len(end) == len(score) == len(window) == len(conformation)
+for batch in engine.stream(sequence, chunk=slice_size):
+    assert isinstance(batch, zhuntrs.Prediction)
+    # Filtering can produce an empty prediction chunk
+    assert 0 <= len(batch) <= slice_size
+    assert len(batch.start) == len(batch.end) == len(batch.zhscore)
+    assert len(batch.sequence) == len(batch.conformation) == len(batch)
     ...
 ```
 
-This mode is equivalent to calling `zhuntrs.predict` on the entire sequence and processing the output slice by slice,
-where each slice has a size equal to `ssize`, except, perhaps, for the last one. Note that the 'wrapping around' of the
-sequence in this mode occurs as usual, i.e., only once, and all coordinates are provided relative to the original
-sequence.
+Concatenating the streamed results is equivalent to calling `engine.predict` on the entire sequence.
+
+An engine can be shared between threads, including on free-threaded Python. Multiple threads can also 
+consume one iterator; its calls are serialized so each chunk is returned once.
+
+Engines and predictions support pickling:
+
+```python
+import pickle
+
+restored = pickle.loads(pickle.dumps(engine))
+assert restored == engine
+assert restored.predict(sequence) == engine.predict(sequence)
+assert pickle.loads(pickle.dumps(prediction)) == prediction
+```
+
+The wheel includes type stubs for engines, predictions, and prediction iterators.
 
 ### Compatibility
 
@@ -76,10 +91,21 @@ This version has been tested against the original C implementation compiled with
 The output for human mtDNA, a random 1kb sequence, and subsequences of human chrY or HSV-1 genome matches the output of
 the C implementation (see tests; 12 digits after the decimal point are identical).
 
-Reference outputs were generated using the `tests/resources/make-references.sh` script. The reference implementation
-used is also provided in the same folder (`zhunt3-reference.c`).
+Reference outputs were generated using the `tests/resources/make-references.sh` script. The reference implementation used is also provided in the same folder (`zhunt-reference.c`). Note that the license
+of the reference implementation (MIT).
 
 ### Development
 
-Publishing to PyPI is done automatically by the CI pipeline. To publish a new version, simply create a new tag and push
-it to the repository. The CI pipeline will take care of the rest.
+Use [Pixi](https://pixi.sh) to install the pinned development environment and run checks:
+
+```shell
+pixi run --locked rs-ci     # Rust formatting, compilation, Clippy, and tests
+pixi run --locked py-ci     # Build the extension and check Python bindings and typing
+pixi run --locked ci        # The full CI suite
+```
+
+The default environment uses free-threaded Python 3.15. Named environments `py-3-10`
+through `py-3-15`, plus `py-3-14t` and `py-3-15t`, support the wheel matrix on Linux,
+macOS, and Windows.
+
+Publishing to PyPI is done automatically by the CI pipeline after checks and tests. To publish a new version, update the version in `Cargo.toml`, then create and push the matching tag (for example, `v0.0.7`).

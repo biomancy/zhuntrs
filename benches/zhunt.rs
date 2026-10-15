@@ -1,38 +1,44 @@
 #![feature(test)]
 extern crate test;
 
-use std::fs;
+use std::num::NonZeroUsize;
 use std::path::PathBuf;
-use test::{black_box, Bencher};
+use std::{fs, io};
+use test::{Bencher, black_box};
 
-use eyre::{ContextCompat, Result, WrapErr};
-
-use zhuntrs;
-
-fn load_sequence(seqpath: &str) -> Result<Vec<u8>> {
-    let file = PathBuf::from(file!());
-    let directory = file.parent().wrap_err("Unable to get parent directory")?;
-
-    let seqcontent = fs::read_to_string(directory.join(seqpath))
-        .wrap_err(format!("Unable to read test sequence: {seqpath}"))?;
+fn load_sequence(seqpath: &str) -> io::Result<Vec<u8>> {
+    let directory = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests");
+    let seqcontent = fs::read_to_string(directory.join(seqpath))?;
     let sequence = seqcontent.trim();
     Ok(sequence.bytes().collect())
 }
 
 #[bench]
-fn bench_mtdna_1_6(b: &mut Bencher) -> Result<()> {
-    let sequence = load_sequence("resources/mtDNA.NC_012920.1.txt")
-        .wrap_err("Unable to load mtDNA sequence")?;
+fn bench_mtdna_1_6(b: &mut Bencher) -> io::Result<()> {
+    let sequence = load_sequence("resources/mtDNA.NC_012920.1.txt")?;
 
-    b.iter(|| black_box(zhuntrs::py::predict(&sequence, 1, 6, 0.0, false)));
+    let engine = zhuntrs::Engine::new(
+        NonZeroUsize::new(1).unwrap(),
+        NonZeroUsize::new(6).unwrap(),
+        0.0,
+        false,
+    )
+    .expect("valid benchmark parameters");
+    b.iter(|| black_box(engine.predict(sequence.as_slice())));
     Ok(())
 }
 
 #[bench]
-fn bench_random_5_12(b: &mut Bencher) -> Result<()> {
-    let sequence =
-        load_sequence("resources/random.txt").wrap_err("Unable to load random sequence")?;
+fn bench_random_5_12(b: &mut Bencher) -> io::Result<()> {
+    let sequence = load_sequence("resources/random.txt")?;
 
-    b.iter(|| black_box(zhuntrs::py::predict(&sequence, 5, 12, 0.0, false)));
+    let engine = zhuntrs::Engine::new(
+        NonZeroUsize::new(5).unwrap(),
+        NonZeroUsize::new(12).unwrap(),
+        0.0,
+        false,
+    )
+    .expect("valid benchmark parameters");
+    b.iter(|| black_box(engine.predict(sequence.as_slice())));
     Ok(())
 }

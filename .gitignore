@@ -71,3 +71,8 @@ docs/_build/
 
 # Pyenv
 .python-version
+
+# Pixi environments and analysis caches
+.pixi/
+.mypy_cache/
+.ruff_cache/

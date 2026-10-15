@@ -3,13 +3,20 @@ name = "zhuntrs"
 requires-python = ">=3.10"
 classifiers = [
     "Programming Language :: Rust",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
+    "Programming Language :: Python :: Free Threading :: 3 - Stable",
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
 dynamic = ["version", "description", "license", "authors", "readme"]
 
 [build-system]
-requires = ["maturin>=1.10.2,<2.0"]
+requires = ["maturin>=1.15.0,<2.0"]
 build-backend = "maturin"
 
 [tool.maturin]
@@ -17,3 +24,21 @@ bindings = "pyo3"
 features = ["pyo3/extension-module"]
 compatibility = "manylinux2014"
 profile = "release"
+locked = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+files = ["tests", "zhuntrs.pyi"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+include = ["tests/**/*.py", "zhuntrs.pyi"]
+
+[tool.ruff.lint]
+extend-select = ["I", "UP", "B"]
