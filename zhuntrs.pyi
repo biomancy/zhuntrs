@@ -1,0 +1,66 @@
+from collections.abc import Iterator, Sequence
+from typing import final
+
+__all__ = ["Engine", "Prediction", "PredictionIterator"]
+
+@final
+class Prediction:
+    def __new__(
+        cls,
+        start: Sequence[int],
+        end: Sequence[int],
+        zhscore: Sequence[float],
+        sequence: Sequence[str],
+        conformation: Sequence[str],
+    ) -> Prediction: ...
+    @property
+    def start(self) -> tuple[int, ...]: ...
+    @property
+    def end(self) -> tuple[int, ...]: ...
+    @property
+    def zhscore(self) -> tuple[float, ...]: ...
+    @property
+    def sequence(self) -> tuple[str, ...]: ...
+    @property
+    def conformation(self) -> tuple[str, ...]: ...
+    def __len__(self) -> int: ...
+    def __eq__(self, other: object, /) -> bool: ...
+    def __reduce__(
+        self,
+    ) -> tuple[
+        type[Prediction],
+        tuple[
+            tuple[int, ...],
+            tuple[int, ...],
+            tuple[float, ...],
+            tuple[str, ...],
+            tuple[str, ...],
+        ],
+    ]: ...
+
+@final
+class Engine:
+    def __new__(
+        cls,
+        mindn: int,
+        maxdn: int,
+        threshold: float = 0.0,
+        wrap: bool = False,
+    ) -> Engine: ...
+    @property
+    def mindn(self) -> int: ...
+    @property
+    def maxdn(self) -> int: ...
+    @property
+    def threshold(self) -> float: ...
+    @property
+    def wrap(self) -> bool: ...
+    def predict(self, sequence: bytes) -> Prediction: ...
+    def stream(self, sequence: bytes, chunk: int = 1024) -> PredictionIterator: ...
+    def __reduce__(self) -> tuple[type[Engine], tuple[int, int, float, bool]]: ...
+
+@final
+class PredictionIterator(Iterator[Prediction]):
+    def __iter__(self) -> PredictionIterator: ...
+    def __next__(self) -> Prediction: ...
+    def consume(self) -> Prediction: ...

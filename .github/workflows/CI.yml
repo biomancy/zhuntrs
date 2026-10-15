@@ -2,117 +2,148 @@ name: CI
 
 on:
   push:
-    branches:
-      - main
-      - master
-    tags:
-      - '*'
+    branches: [main, master]
+    tags: ['v*']
   pull_request:
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
 
+defaults:
+  run:
+    shell: bash
+
+env:
+  CARGO_TERM_COLOR: always
+  PIXI_VERSION: v0.81.0
+
 jobs:
-  linux:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        target: [ x86_64 ]
-        python: ['3.14', '3.13', '3.12', '3.11', '3.10']
+  checks:
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v3
-      - name: Build wheels
-        uses: PyO3/maturin-action@v1
+      - uses: actions/checkout@v7
+      - uses: prefix-dev/setup-pixi@v0.11.2
         with:
-          target: ${{ matrix.target }}
-          args: --release --out dist --interpreter python${{ matrix.python }}
-          sccache: 'true'
-          manylinux: auto
-      - name: Upload wheels
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-${{ matrix.target }}-${{ matrix.python }}-wheels
-          path: dist
+          pixi-version: ${{ env.PIXI_VERSION }}
+          locked: true
+          cache: true
+      - name: Check release tag matches package version
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        shell: pixi run --locked python {0}
+        run: |
+          import os
+          import tomllib
+          from pathlib import Path
 
-  windows:
-    runs-on: windows-latest
-    strategy:
-      matrix:
-        target: [x64]
-        python: ['3.14', '3.13', '3.12', '3.11', '3.10']
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python }}
-          architecture: ${{ matrix.target }}
-      - name: Build wheels
-        uses: PyO3/maturin-action@v1
-        with:
-          target: ${{ matrix.target }}
-          args: --release --out dist --interpreter python${{ matrix.python }}
-          sccache: 'true'
-      - name: Upload wheels
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-${{ matrix.target }}-${{ matrix.python }}-wheels
-          path: dist
-
-  macos:
-    runs-on: macos-latest
-    strategy:
-      matrix:
-        target: [x86_64]
-        python: ['3.14', '3.13', '3.12', '3.11', '3.10']
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python }}
-      - name: Build wheels
-        uses: PyO3/maturin-action@v1
-        with:
-          target: ${{ matrix.target }}
-          args: --release --out dist --interpreter python${{ matrix.python }}
-          sccache: 'true'
-      - name: Upload wheels
-        uses: actions/upload-artifact@v4
-        with:
-          name: macos-${{ matrix.target }}-${{ matrix.python }}-wheels
-          path: dist
-
-  sdist:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
+          version = tomllib.loads(Path('Cargo.toml').read_text())['package']['version']
+          if os.environ['RELEASE_TAG'] != f'v{version}':
+              raise SystemExit(f'Release tag must be v{version}')
+      - name: Run Rust and Python checks
+        run: pixi run --locked ci
       - name: Build sdist
-        uses: PyO3/maturin-action@v1
-        with:
-          command: sdist
-          args: --out dist
+        run: pixi run --locked py-sdist
       - name: Upload sdist
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: sdist-wheels
-          path: dist
+          path: dist/*.tar.gz
+          if-no-files-found: error
+
+  wheels:
+    name: ${{ matrix.platform.name }} / Python ${{ matrix.python.version }}
+    runs-on: ${{ matrix.platform.runner }}
+    needs: checks
+    strategy:
+      fail-fast: false
+      matrix:
+        python:
+          - { version: '3.10', environment: py-3-10 }
+          - { version: '3.11', environment: py-3-11 }
+          - { version: '3.12', environment: py-3-12 }
+          - { version: '3.13', environment: py-3-13 }
+          - { version: '3.14', environment: py-3-14 }
+          - { version: '3.14t', environment: py-3-14t }
+          - { version: '3.15', environment: py-3-15 }
+          - { version: '3.15t', environment: py-3-15t }
+        platform:
+          - name: linux-x86_64
+            runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+          - name: windows-x86_64
+            runner: windows-latest
+            target: x86_64-pc-windows-msvc
+          - name: macos-x86_64
+            runner: macos-15-intel
+            target: x86_64-apple-darwin
+    steps:
+      - uses: actions/checkout@v7
+      - uses: prefix-dev/setup-pixi@v0.11.2
+        with:
+          pixi-version: ${{ env.PIXI_VERSION }}
+          environments: ${{ matrix.python.environment }}
+          # Host compiler settings must not leak into the manylinux container.
+          activate-environment: ${{ runner.os != 'Linux' }}
+          locked: true
+          cache: true
+      - name: Locate the environment interpreter
+        if: runner.os != 'Linux'
+        id: python
+        run: |
+          pixi run --locked -e ${{ matrix.python.environment }} python - <<'PYTHON'
+          import os
+          import sys
+
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              print(f'path={sys.executable}', file=output)
+          PYTHON
+      - name: Build wheel
+        uses: PyO3/maturin-action@v1
+        with:
+          maturin-version: '1.15.0'
+          rust-toolchain: ${{ runner.os == 'Linux' && '1.99.0' || '' }}
+          target: ${{ matrix.platform.target }}
+          manylinux: '2014'
+          # Linux uses the container interpreter; other platforms use Pixi's interpreter.
+          args: --out dist --interpreter "${{ runner.os == 'Linux' && format('python{0}', matrix.python.version) || steps.python.outputs.path }}"
+          sccache: 'true'
+      - name: Install built wheel
+        run: |
+          pixi run --locked -e ${{ matrix.python.environment }} python -m pip install --force-reinstall --no-deps --only-binary=:all: dist/*.whl
+      - name: Test installed wheel, free-threading, and C reference compatibility
+        run: pixi run --locked -e ${{ matrix.python.environment }} py-test-wheel
+      - name: Upload tested wheel
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.platform.name }}-${{ matrix.python.version }}-wheels
+          path: dist/*.whl
+          if-no-files-found: error
 
   release:
     name: Release
-    runs-on: ubuntu-latest
-    if: "startsWith(github.ref, 'refs/tags/')"
-    needs: [linux, windows, macos, sdist]
+    runs-on: ubuntu-24.04
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [checks, wheels]
     steps:
-      - name: Download all wheels
-        uses: actions/download-artifact@v5
+      - uses: actions/checkout@v7
+      - uses: prefix-dev/setup-pixi@v0.11.2
+        with:
+          pixi-version: ${{ env.PIXI_VERSION }}
+          locked: true
+          cache: true
+      - name: Download tested distributions
+        uses: actions/download-artifact@v8
         with:
           pattern: '*-wheels'
           path: dist
           merge-multiple: true
       - name: Publish to PyPI
-        uses: PyO3/maturin-action@v1
         env:
           MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
-        with:
-          command: upload
-          args: --non-interactive --skip-existing dist/*
+        run: pixi run --locked maturin upload --non-interactive --skip-existing dist/*

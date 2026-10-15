@@ -1,0 +1,79 @@
+[workspace]
+name = "zhuntrs"
+channels = ["conda-forge"]
+platforms = ["linux-64", "osx-64", "win-64"]
+
+[environments]
+default = ["rust", "python", "py-3-15t"]
+rust = ["rust", "py-3-15t"]
+py-3-10 = ["rust", "python", "py-3-10"]
+py-3-11 = ["rust", "python", "py-3-11"]
+py-3-12 = ["rust", "python", "py-3-12"]
+py-3-13 = ["rust", "python", "py-3-13"]
+py-3-14 = ["rust", "python", "py-3-14"]
+py-3-14t = ["rust", "python", "py-3-14t"]
+py-3-15 = ["rust", "python", "py-3-15"]
+py-3-15t = ["rust", "python", "py-3-15t"]
+
+[tasks]
+ci = { depends-on = ["rs-ci", "py-ci"] }
+
+[feature.rust.dependencies]
+rust = "==1.99.0"
+rust-src = "==1.99.0"
+
+[feature.rust.tasks]
+rs-ci-fmt = "cargo fmt --all -- --check"
+rs-ci-check = "cargo check --all-features --locked --lib --tests"
+rs-ci-clippy = "cargo clippy --all-features --locked --lib --tests -- -D warnings"
+rs-ci-test = "cargo test --all-features --locked"
+rs-ci = { depends-on = ["rs-ci-fmt", "rs-ci-check", "rs-ci-clippy", "rs-ci-test"] }
+
+[feature.python.dependencies]
+pip = "==26.2.1"
+
+[feature.python.pypi-dependencies]
+maturin = "==1.15.0"
+mypy = "==2.4.0"
+pytest = "==9.1.1"
+ruff = "==0.17.0"
+
+[feature.python.tasks]
+py-ci-ruff = "ruff check"
+py-ci-format = "ruff format --check"
+py-ci-mypy = "mypy"
+py-ci-build = "maturin develop"
+py-ci-test = { cmd = "python -m pytest", depends-on = ["py-ci-build"] }
+py-ci-stubs = { cmd = "python -m mypy.stubtest zhuntrs --ignore-missing-stub", depends-on = ["py-ci-build"] }
+py-ci = { depends-on = ["py-ci-ruff", "py-ci-format", "py-ci-mypy", "py-ci-test", "py-ci-stubs"] }
+py-test-wheel = "python -m pytest"
+py-sdist = "maturin sdist --out dist"
+
+[feature.py-3-10.dependencies]
+python = "3.10.*"
+
+[feature.py-3-11.dependencies]
+python = "3.11.*"
+
+[feature.py-3-12.dependencies]
+python = "3.12.*"
+
+[feature.py-3-13.dependencies]
+python = "3.13.*"
+python_abi = { version = "3.13.*", build = "*_cp313" }
+
+[feature.py-3-14.dependencies]
+python = "3.14.*"
+python_abi = { version = "3.14.*", build = "*_cp314" }
+
+[feature.py-3-14t.dependencies]
+python-freethreading = "3.14.*"
+libpython = "3.14.*"
+
+[feature.py-3-15.dependencies]
+python = "3.15.*"
+python_abi = { version = "3.15.*", build = "*_cp315" }
+
+[feature.py-3-15t.dependencies]
+python-freethreading = "3.15.*"
+libpython = "3.15.*"

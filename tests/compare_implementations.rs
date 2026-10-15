@@ -1,34 +1,33 @@
 use std::fs;
 use std::path::PathBuf;
 
-use eyre::{eyre, ContextCompat, Result, WrapErr};
 use itertools::Itertools;
 
-use zhuntrs;
+type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 fn compare_implementations(seqpath: &str, expected: &str) -> Result<()> {
     let file = PathBuf::from(file!());
-    let directory = file.parent().wrap_err("Unable to get parent directory")?;
+    let directory = file.parent().ok_or("Unable to get parent directory")?;
 
     let seqcontent = fs::read_to_string(directory.join(seqpath))
-        .wrap_err(format!("Unable to read test sequence: {seqpath}"))?;
+        .map_err(|err| format!("Unable to read test sequence {seqpath}: {err}"))?;
     let sequence = seqcontent.trim();
 
     let expected = fs::read_to_string(directory.join(expected))
-        .wrap_err(format!("Unable to read expected result: {}", expected))?;
+        .map_err(|err| format!("Unable to read expected result {expected}: {err}"))?;
     let mut lines = expected.lines();
 
     // Parse algorithm parameters
     let (_, length, minw, maxw) = lines
         .next()
-        .wrap_err("Unable to get Z-Hunt parameters: target file is empty")?
+        .ok_or("Unable to get Z-Hunt parameters: target file is empty")?
         .split_whitespace()
         .collect_tuple()
-        .wrap_err("Unable to parse Z-Hunt parameters: expected 4 values")?;
+        .ok_or("Unable to parse Z-Hunt parameters: expected 4 values")?;
 
     let length: usize = length
         .parse()
-        .wrap_err("Unable to parse Z-Hunt parameter: length")?;
+        .map_err(|err| format!("Unable to parse Z-Hunt parameter length: {err}"))?;
     assert_eq!(
         length,
         sequence.len(),
@@ -39,37 +38,53 @@ fn compare_implementations(seqpath: &str, expected: &str) -> Result<()> {
 
     let mindn = minw
         .parse()
-        .wrap_err("Unable to parse Z-Hunt parameter: minw")?;
+        .map_err(|err| format!("Unable to parse Z-Hunt parameter minw: {err}"))?;
     let maxdn = maxw
         .parse()
-        .wrap_err("Unable to parse Z-Hunt parameter: maxw")?;
+        .map_err(|err| format!("Unable to parse Z-Hunt parameter maxw: {err}"))?;
 
-    let predicted = zhuntrs::py::predict(sequence.as_bytes(), mindn, maxdn, 0.0, true)?;
+    let predicted = zhuntrs::Engine::new(mindn, maxdn, 0.0, true)?.predict(sequence.as_bytes())?;
+    for count in [
+        predicted.start.len(),
+        predicted.end.len(),
+        predicted.zhscore.len(),
+        predicted.sequence.len(),
+        predicted.conformation.len(),
+    ] {
+        assert_eq!(count, length, "Prediction count mismatch");
+    }
 
     let mut errors = vec![];
     for (ind, line) in lines.enumerate() {
-        let (_, _, exp_zhscore, exp_conformation) =
-            line.split_whitespace().collect_tuple().wrap_err(format!(
-                "Unable to parse expected result in the line: {line}"
-            ))?;
+        let (_, _, exp_zhscore, exp_conformation) = line
+            .split_whitespace()
+            .collect_tuple()
+            .ok_or_else(|| format!("Unable to parse expected result in the line: {line}"))?;
 
         let exp_start = ind;
         let exp_end = exp_start + exp_conformation.len();
 
         let exp_zhscore: f64 = exp_zhscore
             .parse()
-            .wrap_err(format!("Unable to parse expected ZH-score: {exp_zhscore}"))?;
+            .map_err(|err| format!("Unable to parse expected ZH-score {exp_zhscore}: {err}"))?;
 
-        let pred_start = predicted.0[ind];
-        let pred_end = predicted.1[ind];
-        let pred_zhscore = predicted.2[ind];
-        let pred_sequence = &predicted.3[ind];
-        let pred_conformation = &predicted.4[ind];
+        let pred_start = predicted.start[ind];
+        let pred_end = predicted.end[ind];
+        let pred_zhscore = predicted.zhscore[ind];
+        let pred_sequence: String = predicted.sequence[ind]
+            .iter()
+            .map(ToString::to_string)
+            .collect();
+        let pred_conformation: String = predicted.conformation[ind]
+            .iter()
+            .map(ToString::to_string)
+            .collect();
 
         let diff = (exp_zhscore - pred_zhscore).abs();
         if exp_start != pred_start
             || exp_end != pred_end
             || exp_conformation != pred_conformation
+            || !pred_zhscore.is_finite()
             || diff >= 1e-12
         {
             errors.push(format!(
@@ -84,9 +99,9 @@ fn compare_implementations(seqpath: &str, expected: &str) -> Result<()> {
     }
 
     let total = errors.len();
-    let freq = total as f64 / predicted.0.len() as f64 * 100.0;
+    let freq = total as f64 / predicted.start.len() as f64 * 100.0;
     let errors = errors.join("\n");
-    Err(eyre!("Total: {total} ({freq:.2}%)\n{errors}"))
+    Err(format!("Total: {total} ({freq:.2}%)\n{errors}").into())
 }
 
 #[test]
