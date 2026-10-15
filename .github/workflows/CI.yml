@@ -88,13 +88,15 @@ jobs:
         with:
           pixi-version: ${{ env.PIXI_VERSION }}
           environments: ${{ matrix.python.environment }}
-          activate-environment: true
+          # Host compiler settings must not leak into the manylinux container.
+          activate-environment: ${{ runner.os != 'Linux' }}
           locked: true
           cache: true
       - name: Locate the environment interpreter
+        if: runner.os != 'Linux'
         id: python
         run: |
-          python - <<'PYTHON'
+          pixi run --locked -e ${{ matrix.python.environment }} python - <<'PYTHON'
           import os
           import sys
 
@@ -113,7 +115,7 @@ jobs:
           sccache: 'true'
       - name: Install built wheel
         run: |
-          python -m pip install --force-reinstall --no-deps --only-binary=:all: dist/*.whl
+          pixi run --locked -e ${{ matrix.python.environment }} python -m pip install --force-reinstall --no-deps --only-binary=:all: dist/*.whl
       - name: Test installed wheel, free-threading, and C reference compatibility
         run: pixi run --locked -e ${{ matrix.python.environment }} py-test-wheel
       - name: Upload tested wheel
